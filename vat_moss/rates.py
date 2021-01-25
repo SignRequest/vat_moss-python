@@ -77,7 +77,7 @@ BY_COUNTRY = {
         'rate': Decimal('0.21')
     },
     'DE': {  # Germany
-        'rate': Decimal('0.16'),
+        'rate': Decimal('0.19'),
         'exceptions': {
             'Büsingen am Hochrhein': Decimal('0.0'),
             'Heligoland': Decimal('0.0')
