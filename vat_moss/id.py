@@ -26,6 +26,7 @@ UK_HMRC_BASE_URL = os.environ.get('VATMOSS_UK_HMRC_BASE_URL')
 UK_HMRC_CLIENT_ID = os.environ.get('VATMOSS_UK_HMRC_CLIENT_ID')
 UK_HMRC_CLIENT_SECRET = os.environ.get('VATMOSS_UK_HMRC_CLIENT_SECRET')
 
+
 def normalize(vat_id):
     """
     Accepts a VAT ID and normaizes it, getting rid of spaces, periods, dashes
