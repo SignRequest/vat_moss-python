@@ -1,23 +1,30 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-
+import os
 import re
 import json
 from xml.etree import ElementTree
 import cgi
 
+import requests
+
 try:
     # Python 3
     from urllib.request import Request, urlopen
     from urllib.error import HTTPError
+
     str_cls = str
 except (ImportError):
     # Python 2
     from urllib2 import Request, urlopen, HTTPError
+
     str_cls = unicode
 
 from .errors import InvalidError, WebServiceError, WebServiceUnavailableError
 
+UK_HMRC_BASE_URL = os.environ.get('VATMOSS_UK_HMRC_BASE_URL')
+UK_HMRC_CLIENT_ID = os.environ.get('VATMOSS_UK_HMRC_CLIENT_ID')
+UK_HMRC_CLIENT_SECRET = os.environ.get('VATMOSS_UK_HMRC_CLIENT_SECRET')
 
 def normalize(vat_id):
     """
@@ -171,7 +178,8 @@ def validate(vat_id):
 
             # This should never happen, but keeping it incase the API is changed
             if 'organisasjonsnummer' not in info or info['organisasjonsnummer'] != int(organization_number):
-                raise WebServiceError('No or different value for the "organisasjonsnummer" key in response from data.brreg.no')
+                raise WebServiceError(
+                    'No or different value for the "organisasjonsnummer" key in response from data.brreg.no')
 
             company_name = info['organisasjonsnummer']
 
@@ -182,6 +190,40 @@ def validate(vat_id):
 
             # If we get anything but a 404 we want the exception to be recorded
             raise
+
+    elif country_prefix == 'GB':
+        if not UK_HMRC_BASE_URL or not UK_HMRC_CLIENT_SECRET or not UK_HMRC_CLIENT_ID:
+            raise WebServiceError("UK VAT Missing environment variables")
+
+        auth_url = UK_HMRC_BASE_URL + "/oauth/token"
+        vat_lookup_url = UK_HMRC_BASE_URL + "/organisations/vat/check-vat-number/lookup/" + number
+
+        # Generate token
+        auth_data = dict(client_id=UK_HMRC_CLIENT_ID,
+                         client_secret=UK_HMRC_CLIENT_SECRET,
+                         grant_type='client_credentials')
+        auth_response = requests.post(auth_url, data=auth_data)
+        if auth_response.status_code != 200:
+            raise WebServiceError("UK VAT Authentication failed")
+
+        auth_response_json = json.loads(auth_response.text)
+        token = auth_response_json.get("access_token")
+
+        # Retrieve data from API
+        headers = {"Authorization": "Bearer " + token}
+        vat_response = requests.get(vat_lookup_url, headers=headers)
+        status_code = vat_response.status_code
+        if status_code != 200:
+            if status_code == 404:
+                raise InvalidError('VAT ID is invalid')
+            raise  # catch all errors
+
+        vat_response_json = json.loads(vat_response.text)
+        target = vat_response_json.get("target", {})
+        if target.get("vatNumber") != number:
+            raise WebServiceError(
+                'No or different value for the "vatNumber" key in response from hmrc.gov.uk')
+        company_name = target.get("name")
 
     # EU countries
     else:
@@ -247,7 +289,7 @@ def validate(vat_id):
 
         namespaces = {
             'soap': 'http://schemas.xmlsoap.org/soap/envelope/',
-            'vat':  'urn:ec.europa.eu:taxud:vies:services:checkVat:types'
+            'vat': 'urn:ec.europa.eu:taxud:vies:services:checkVat:types'
         }
         valid_elements = envelope.findall('./soap:Body/vat:checkVatResponse/vat:valid', namespaces)
         if not valid_elements:
