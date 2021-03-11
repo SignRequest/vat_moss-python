@@ -124,7 +124,7 @@ BY_COUNTRY = {
         'rate': Decimal('0.27')
     },
     'IE': {  # Ireland
-        'rate': Decimal('0.21')
+        'rate': Decimal('0.23')
     },
     'IT': {  # Italy
         'rate': Decimal('0.22'),
