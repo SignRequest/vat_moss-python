@@ -4,7 +4,9 @@ from __future__ import unicode_literals
 from xml.etree import ElementTree
 import cgi
 from decimal import Decimal
-
+import datetime
+import requests
+import xmltodict
 try:
     # Python 3
     from urllib.request import urlopen
@@ -155,9 +157,28 @@ def fetch():
         rate = currency_element.attrib.get('rate')
         rates[code] = Decimal(rate)
 
+    # Update GBP rate according to HMRC.gov.uk.
+    gbp_rate = get_gbp_rate()
+    if gbp_rate > 0:
+        rates['GBP'] = Decimal(gbp_rate)
     return (date, rates)
 
-
+def get_gbp_rate():
+    gbp_rate = 0
+    try:
+        today = datetime.date.today()
+        date_format = today.strftime("%m%y") #mmyy format
+        url = f"http://www.hmrc.gov.uk/softwaredevelopers/rates/exrates-monthly-{date_format}.XML"
+        response = requests.get(url)
+        data = xmltodict.parse(response.content)
+        for item in data.get('exchangeRateMonthList', {}).get('exchangeRate', []):
+            if item.get('currencyCode') == 'EUR': 
+                rate = Decimal(item.get('rateNew', 0))
+                gbp_rate = Decimal(1 / rate) # EUR TO GBP
+    except Exception as e:
+        gbp_rate = 0
+    return gbp_rate
+    
 def setup_xrates(base, rates):
     """
     If using the Python money package, this will set up the xrates exchange

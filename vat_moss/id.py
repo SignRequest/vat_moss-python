@@ -217,7 +217,8 @@ def validate(vat_id):
         if status_code != 200:
             if status_code == 404:
                 raise InvalidError('VAT ID is invalid')
-            raise  # catch all errors
+              # catch all errors
+            raise InvalidError('Error ' + status_code)
 
         vat_response_json = json.loads(vat_response.text)
         target = vat_response_json.get("target", {})
